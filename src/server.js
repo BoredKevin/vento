@@ -268,8 +268,13 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Gather secondary metadata for evasive incognito users
+    const ip = getClientIp(socket.request);
+    const ua = socket.request.headers['user-agent'] || '';
+    const device = parseUserAgent(ua);
+
     // Check shadow ban
-    const isBanned = db.isBanned(fingerprint);
+    const isBanned = db.isBanned(fingerprint, ip, device);
 
     activeCallsigns.add(callsign);
     socketToCallsign.set(socket.id, callsign);

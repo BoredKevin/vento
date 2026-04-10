@@ -48,6 +48,10 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
 `);
 
+// Support upgrading older schemas
+try { db.exec('ALTER TABLE bans ADD COLUMN ip TEXT'); } catch(e) {}
+try { db.exec('ALTER TABLE bans ADD COLUMN user_agent TEXT'); } catch(e) {}
+
 // Initialize default settings
 const initSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
 initSetting.run('owner_status', 'offline');
@@ -71,7 +75,7 @@ const stmts = {
   getMessagesBySession: db.prepare('SELECT * FROM messages WHERE session_id = ? ORDER BY timestamp ASC'),
 
   // Bans
-  addBan: db.prepare('INSERT INTO bans (fingerprint, reason) VALUES (?, ?)'),
+  addBan: db.prepare('INSERT INTO bans (fingerprint, ip, user_agent, reason) VALUES (?, ?, ?, ?)'),
   removeBan: db.prepare('DELETE FROM bans WHERE fingerprint = ?'),
   isBanned: db.prepare('SELECT COUNT(*) as count FROM bans WHERE fingerprint = ?'),
   getAllBans: db.prepare('SELECT * FROM bans ORDER BY created_at DESC'),
@@ -117,21 +121,45 @@ module.exports = {
   },
 
   addBan(fingerprint, reason = '') {
-    const result = stmts.addBan.run(fingerprint, reason);
+    // Snapshot the user's latest networking info to ban via secondary methods (Incognito bypass)
+    const session = db.prepare('SELECT ip, user_agent FROM sessions WHERE fingerprint = ? ORDER BY created_at DESC LIMIT 1').get(fingerprint);
+    const ip = session ? session.ip : null;
+    const ua = session ? session.user_agent : null;
+
+    const result = stmts.addBan.run(fingerprint, ip, ua, reason);
     stmts.shadowBanSession.run(fingerprint);
+
+    if (ip && ua) {
+      db.prepare('UPDATE sessions SET is_shadow_banned = 1 WHERE ip = ? AND user_agent = ? AND closed_at IS NULL').run(ip, ua);
+    }
     return result;
   },
 
   removeBan(fingerprint) {
+    const ban = db.prepare('SELECT ip, user_agent FROM bans WHERE fingerprint = ?').get(fingerprint);
     const result = stmts.removeBan.run(fingerprint);
     stmts.unshadowBanSession.run(fingerprint);
+
+    if (ban && ban.ip && ban.user_agent) {
+      db.prepare('UPDATE sessions SET is_shadow_banned = 0 WHERE ip = ? AND user_agent = ? AND closed_at IS NULL').run(ban.ip, ban.user_agent);
+    }
     return result;
   },
 
-  isBanned(fingerprint) {
+  isBanned(fingerprint, ip = null, userAgent = null) {
     if (!fingerprint) return false;
-    const result = stmts.isBanned.get(fingerprint);
-    return result && result.count > 0;
+    
+    // Check primary fingerprint
+    const fpCheck = stmts.isBanned.get(fingerprint);
+    if (fpCheck && fpCheck.count > 0) return true;
+
+    // Check secondary network profile (defeats incognito)
+    if (ip && ip !== 'unknown' && ip !== '::1' && userAgent && userAgent !== 'Unknown') {
+      const ipCheck = db.prepare('SELECT COUNT(*) as count FROM bans WHERE ip = ? AND user_agent = ?').get(ip, userAgent);
+      if (ipCheck && ipCheck.count > 0) return true;
+    }
+
+    return false;
   },
 
   getAllBans() {
