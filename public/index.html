@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vento — Say What's On Your Mind</title>
+  <meta name="description" content="Send anonymous messages and vent freely. Your identity stays hidden.">
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@4/dist/fp.min.js"></script>
+</head>
+<body>
+  <canvas id="bg-canvas"></canvas>
+
+  <div class="landing-container">
+    <!-- Brand -->
+    <div class="brand fade-in">
+      <h1 class="brand-title">Vento</h1>
+      <p class="brand-tagline">Say what's on your mind — anonymously.</p>
+    </div>
+
+    <!-- Status -->
+    <div class="status-indicator fade-in" id="status-indicator">
+      <span class="status-dot offline" id="status-dot"></span>
+      <span id="status-text">Kevin is offline</span>
+    </div>
+
+    <!-- Main Card -->
+    <div class="landing-card glass-card fade-in">
+
+      <!-- Step 1: Turnstile verification (shown first) -->
+      <div id="step-verify">
+        <p class="step-description">Complete verification to start chatting</p>
+
+        <div class="turnstile-wrapper" id="turnstile-wrapper">
+          <div id="turnstile-widget"></div>
+        </div>
+
+        <button class="btn-primary" id="btn-start" disabled>
+          <span id="btn-start-text">Verify to Start</span>
+        </button>
+
+        <div class="divider">or rejoin a session</div>
+
+        <form class="rejoin-form" id="rejoin-form">
+          <input type="text" class="input-field" id="rejoin-input"
+                 placeholder="e.g. Tiger42" maxlength="20" autocomplete="off" disabled>
+          <button type="submit" class="btn-secondary" id="btn-rejoin" disabled>Rejoin</button>
+        </form>
+      </div>
+
+      <!-- Step 2: Callsign reveal (shown after starting) -->
+      <div id="step-callsign" style="display: none;">
+        <p class="step-description">Your callsign for this session</p>
+
+        <div class="callsign-display">
+          <p class="callsign-label">Save this to rejoin later</p>
+          <p class="callsign-value" id="callsign-value"></p>
+        </div>
+
+        <button class="btn-primary" id="btn-continue">
+          Continue to Chat →
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script src="/js/landing.js"></script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+{
+  "name": "vento",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "build": "javascript-obfuscator src/frontend --output public/js --compact true",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BoredKevin/vento.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/BoredKevin/vento/issues"
+  },
+  "homepage": "https://github.com/BoredKevin/vento#readme",
+  "dependencies": {
+    "bad-words": "^4.0.0",
+    "better-sqlite3": "^12.8.0",
+    "discord.js": "^14.26.2",
+    "dotenv": "^17.4.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.3.2",
+    "helmet": "^8.1.0",
+    "socket.io": "^4.8.3",
+    "ua-parser-js": "^2.0.9",
+    "xss": "^1.0.15"
+  },
+  "devDependencies": {
+    "javascript-obfuscator": "^5.4.1"
+  }
+}
