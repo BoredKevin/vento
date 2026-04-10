@@ -149,7 +149,7 @@ async function handleInteraction(interaction) {
 
     try {
       await interaction.channel.edit({ name: `closed-${callsign.toLowerCase()}` });
-    } catch (e) {  }
+    } catch (e) { }
   }
 
   else if (commandName === 'status') {
@@ -174,7 +174,7 @@ async function handleInteraction(interaction) {
       .setTitle('🔨 Active Shadow-Bans')
       .setColor(0xff4444)
       .setDescription(bans.map((b, i) =>
-        `**${i + 1}.** \`${b.fingerprint.slice(0, 16)}...\`\n   Reason: ${b.reason || 'N/A'}\n   Since: ${b.created_at}`
+        `**${i + 1}.** \`${b.fingerprint}\`\n   Reason: ${b.reason || 'N/A'}\n   Since: ${b.created_at}`
       ).join('\n\n'));
 
     await interaction.reply({ embeds: [embed], ephemeral: true });
@@ -212,7 +212,7 @@ async function createVentChannel(callsign, metadata) {
 
     const messages = await channel.messages.fetch({ limit: 1 });
     const pinMsg = messages.first();
-    if (pinMsg) await pinMsg.pin().catch(() => {});
+    if (pinMsg) await pinMsg.pin().catch(() => { });
 
     if (notifyChannelId && /^\d+$/.test(notifyChannelId)) {
       try {
@@ -293,7 +293,7 @@ async function sendTypingToChannel(callsign) {
   try {
     const channel = await client.channels.fetch(channelId);
     await channel.sendTyping();
-  } catch (err) {  }
+  } catch (err) { }
 }
 
 function removeChannelMapping(callsign) {
