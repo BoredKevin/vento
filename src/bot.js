@@ -2,20 +2,15 @@ const { Client, GatewayIntentBits, ChannelType, PermissionFlagsBits, EmbedBuilde
 const db = require('./db');
 
 let client = null;
-let io = null; // Socket.IO instance — set externally
+let io = null; // Socket.IO instance - set externally
 let guildId = null;
 let categoryId = null;
 let notifyChannelId = null;
 let ownerId = null;
 
-// Map: discord channel ID -> callsign (for routing Discord replies back)
 const channelToCallsign = new Map();
-// Map: callsign -> discord channel ID
 const callsignToChannel = new Map();
 
-/**
- * Initialize the Discord bot
- */
 async function initBot(socketIo) {
   io = socketIo;
   guildId = process.env.DISCORD_GUILD_ID;
@@ -36,19 +31,14 @@ async function initBot(socketIo) {
     await registerSlashCommands();
   });
 
-  // Handle messages from Discord (Kevin's replies)
   client.on('messageCreate', handleDiscordMessage);
 
-  // Handle slash commands
   client.on('interactionCreate', handleInteraction);
 
   await client.login(process.env.DISCORD_TOKEN);
   return client;
 }
 
-/**
- * Register slash commands
- */
 async function registerSlashCommands() {
   const commands = [
     new SlashCommandBuilder()
@@ -95,21 +85,14 @@ async function registerSlashCommands() {
   }
 }
 
-/**
- * Handle messages sent in Discord channels (Kevin's replies)
- */
 async function handleDiscordMessage(message) {
-  // Ignore bot messages
   if (message.author.bot) return;
 
-  // Check if this is a vent channel
   const callsign = channelToCallsign.get(message.channel.id);
   if (!callsign) return;
 
-  // Only allow the owner to reply
   if (message.author.id !== ownerId) return;
 
-  // Relay to anonymous user via Socket.IO
   if (io) {
     io.to(`session:${callsign}`).emit('message', {
       sender: 'kevin',
@@ -118,7 +101,6 @@ async function handleDiscordMessage(message) {
     });
   }
 
-  // Save to DB
   const session = db.getActiveSession(callsign);
   if (session) {
     db.addMessage({
@@ -129,9 +111,6 @@ async function handleDiscordMessage(message) {
   }
 }
 
-/**
- * Handle slash command interactions
- */
 async function handleInteraction(interaction) {
   if (!interaction.isChatInputCommand()) return;
 
@@ -158,29 +137,25 @@ async function handleInteraction(interaction) {
       return;
     }
 
-    // Notify the anonymous user
     if (io) {
       io.to(`session:${callsign}`).emit('session-closed', { reason: 'Kevin closed the session.' });
     }
 
-    // Close in DB
     db.closeSession(callsign);
     channelToCallsign.delete(interaction.channel.id);
     callsignToChannel.delete(callsign);
 
     await interaction.reply({ content: `✅ Session **${callsign}** closed.` });
 
-    // Archive the channel (rename with closed- prefix)
     try {
       await interaction.channel.edit({ name: `closed-${callsign.toLowerCase()}` });
-    } catch (e) { /* ignore permission errors */ }
+    } catch (e) {  }
   }
 
   else if (commandName === 'status') {
     const state = interaction.options.getString('state');
     db.setOwnerStatus(state);
 
-    // Broadcast to all connected users
     if (io) {
       io.emit('owner-status', { status: state });
     }
@@ -206,29 +181,23 @@ async function handleInteraction(interaction) {
   }
 }
 
-/**
- * Create a Discord channel for a new vent session
- */
 async function createVentChannel(callsign, metadata) {
   if (!client || !guildId) return null;
 
   try {
     const guild = await client.guilds.fetch(guildId);
 
-    // Create the channel (made public / inherits category permissions)
     const channel = await guild.channels.create({
       name: `vent-${callsign.toLowerCase()}`,
       type: ChannelType.GuildText,
       ...(categoryId && /^\d+$/.test(categoryId) ? { parent: categoryId } : {}),
     });
 
-    // Track the mapping
     channelToCallsign.set(channel.id, callsign);
     callsignToChannel.set(callsign, channel.id);
 
-    // Send info embed
     const infoEmbed = new EmbedBuilder()
-      .setTitle(`🌬️ New Vent Session — ${callsign}`)
+      .setTitle(`🌬️ New Vent Session - ${callsign}`)
       .setColor(0x7c3aed)
       .addFields(
         { name: '📍 Location', value: metadata.location || 'Unknown', inline: true },
@@ -241,12 +210,10 @@ async function createVentChannel(callsign, metadata) {
 
     await channel.send({ embeds: [infoEmbed] });
 
-    // Pin the info message
     const messages = await channel.messages.fetch({ limit: 1 });
     const pinMsg = messages.first();
     if (pinMsg) await pinMsg.pin().catch(() => {});
 
-    // Notify in the notification channel
     if (notifyChannelId && /^\d+$/.test(notifyChannelId)) {
       try {
         const notifChannel = await guild.channels.fetch(notifyChannelId);
@@ -276,9 +243,6 @@ async function createVentChannel(callsign, metadata) {
   }
 }
 
-/**
- * Send a message to the vent channel from the anonymous user
- */
 async function sendToChannel(callsign, content) {
   const channelId = callsignToChannel.get(callsign);
   if (!channelId || !client) return;
@@ -303,9 +267,6 @@ async function sendToChannel(callsign, content) {
   }
 }
 
-/**
- * Send a system notification to the vent channel
- */
 async function sendSystemMessage(callsign, text) {
   const channelId = callsignToChannel.get(callsign);
   if (!channelId || !client) return;
@@ -325,9 +286,6 @@ async function sendSystemMessage(callsign, text) {
   }
 }
 
-/**
- * Notify typing in the vent channel
- */
 async function sendTypingToChannel(callsign) {
   const channelId = callsignToChannel.get(callsign);
   if (!channelId || !client) return;
@@ -335,12 +293,9 @@ async function sendTypingToChannel(callsign) {
   try {
     const channel = await client.channels.fetch(channelId);
     await channel.sendTyping();
-  } catch (err) { /* ignore */ }
+  } catch (err) {  }
 }
 
-/**
- * Clean up a channel mapping
- */
 function removeChannelMapping(callsign) {
   const channelId = callsignToChannel.get(callsign);
   if (channelId) {
@@ -359,3 +314,4 @@ module.exports = {
   channelToCallsign,
   callsignToChannel,
 };
+

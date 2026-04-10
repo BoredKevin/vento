@@ -1,17 +1,11 @@
-// ========================================
-// VENTO — Landing Page Logic
-// Turnstile-first flow: verify → start → callsign → chat
-// ========================================
 
 (function () {
   'use strict';
 
-  // --- State ---
   let turnstileToken = null;
   let fingerprint = null;
   let verified = false;
 
-  // --- DOM Elements ---
   const btnStart = document.getElementById('btn-start');
   const btnStartText = document.getElementById('btn-start-text');
   const btnContinue = document.getElementById('btn-continue');
@@ -25,25 +19,20 @@
   const stepCallsign = document.getElementById('step-callsign');
   const toast = document.getElementById('toast');
 
-  // --- Initialize ---
   async function init() {
-    // Check if user already has an active session
     const existingCallsign = localStorage.getItem('vento_callsign');
     if (existingCallsign) {
-      // Verify the session is still active
       try {
         const res = await fetch(`/api/session/${encodeURIComponent(existingCallsign)}`);
         const data = await res.json();
         if (data.exists && !data.closed) {
-          // Auto-navigate to chat
           sessionStorage.setItem('vento_callsign', existingCallsign);
           sessionStorage.setItem('vento_mode', 'rejoin');
           sessionStorage.setItem('vento_fingerprint', localStorage.getItem('vento_fingerprint') || '');
           window.location.href = '/chat.html';
           return;
         }
-      } catch (e) { /* fall through to normal flow */ }
-      // Session doesn't exist or is closed — clear
+      } catch (e) {  }
       localStorage.removeItem('vento_callsign');
     }
 
@@ -54,13 +43,12 @@
     startStatusPolling();
   }
 
-  // --- Fetch owner status ---
   async function fetchStatus() {
     try {
       const res = await fetch('/api/status');
       const data = await res.json();
       updateStatus(data.status);
-    } catch (err) { /* ignore */ }
+    } catch (err) {  }
   }
 
   function updateStatus(status) {
@@ -73,9 +61,7 @@
     setInterval(fetchStatus, 30000);
   }
 
-  // --- Fingerprint ---
   async function initFingerprint() {
-    // Prioritize existing saved fingerprint to ensure absolute persistence per browser
     const stored = localStorage.getItem('vento_fingerprint');
     if (stored) {
       fingerprint = stored;
@@ -94,7 +80,6 @@
     }
   }
 
-  // --- Turnstile ---
   function initTurnstile() {
     if (typeof turnstile === 'undefined') {
       window.addEventListener('load', () => setTimeout(renderTurnstile, 500));
@@ -105,7 +90,6 @@
 
   function renderTurnstile() {
     if (typeof turnstile === 'undefined') {
-      // Fallback for development
       console.warn('Turnstile not available, auto-verifying');
       onTurnstileSuccess('dev-token');
       return;
@@ -152,7 +136,6 @@
     document.getElementById('turnstile-wrapper').style.display = 'none';
   }
 
-  // --- Start Chat (server generates callsign) ---
   btnStart.addEventListener('click', async () => {
     if (!verified) return;
 
@@ -174,17 +157,14 @@
         return;
       }
 
-      // Show callsign reveal
       const callsign = data.callsign;
       callsignEl.textContent = callsign;
 
-      // Persist across refreshes
       localStorage.setItem('vento_callsign', callsign);
       sessionStorage.setItem('vento_callsign', callsign);
       sessionStorage.setItem('vento_mode', 'new');
       sessionStorage.setItem('vento_fingerprint', fingerprint);
 
-      // Switch to step 2
       stepVerify.style.display = 'none';
       stepCallsign.style.display = 'block';
 
@@ -195,12 +175,10 @@
     }
   });
 
-  // --- Continue to Chat ---
   btnContinue.addEventListener('click', () => {
     window.location.href = '/chat.html';
   });
 
-  // --- Rejoin ---
   rejoinForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!verified) return;
@@ -231,14 +209,12 @@
     }
   });
 
-  // --- Toast ---
   function showToast(message, type = 'error') {
     toast.textContent = message;
     toast.className = `toast ${type} show`;
     setTimeout(() => toast.classList.remove('show'), 3500);
   }
 
-  // --- Canvas Background (Wind Particles) ---
   function initCanvas() {
     const canvas = document.getElementById('bg-canvas');
     const ctx = canvas.getContext('2d');
@@ -303,6 +279,6 @@
     draw();
   }
 
-  // --- Boot ---
   init();
 })();
+

@@ -2,7 +2,7 @@
 
 Vento is a lightweight, real-time web application I built that lets people send me anonymous messages and vent without revealing their identity. Think of it like a dark-themed, highly moderated ticketing system where every visitor gets a random anonymous callsign (e.g. `Tiger42`), and their messages are instantly piped directly into a private category on my Discord server. 
 
-From Discord, I can natively read their vents, reply directly back to their browser, or quietly shadow-ban them if they're being annoying—all without ever leaving my Discord client.
+From Discord, I can natively read their vents, reply directly back to their browser, or quietly shadow-ban them if they're being annoying-all without ever leaving my Discord client.
 
 ## Why I Built This
 

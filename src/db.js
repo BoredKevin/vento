@@ -3,10 +3,8 @@ const path = require('path');
 
 const db = new Database(path.join(__dirname, '../data/vento.db'));
 
-// Enable WAL mode for better concurrent read performance
 db.pragma('journal_mode = WAL');
 
-// Create tables
 db.exec(`
   CREATE TABLE IF NOT EXISTS sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,17 +46,13 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
 `);
 
-// Support upgrading older schemas
 try { db.exec('ALTER TABLE bans ADD COLUMN ip TEXT'); } catch(e) {}
 try { db.exec('ALTER TABLE bans ADD COLUMN user_agent TEXT'); } catch(e) {}
 
-// Initialize default settings
 const initSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
 initSetting.run('owner_status', 'offline');
 
-// Prepared statements
 const stmts = {
-  // Sessions
   createSession: db.prepare(`
     INSERT INTO sessions (callsign, fingerprint, ip, location, user_agent, discord_channel_id, is_shadow_banned)
     VALUES (@callsign, @fingerprint, @ip, @location, @userAgent, @discordChannelId, @isShadowBanned)
@@ -68,23 +62,19 @@ const stmts = {
   closeSession: db.prepare('UPDATE sessions SET closed_at = CURRENT_TIMESTAMP WHERE callsign = ?'),
   setChannelId: db.prepare('UPDATE sessions SET discord_channel_id = ? WHERE callsign = ?'),
 
-  // Messages
   addMessage: db.prepare(`
     INSERT INTO messages (session_id, sender, content) VALUES (@sessionId, @sender, @content)
   `),
   getMessagesBySession: db.prepare('SELECT * FROM messages WHERE session_id = ? ORDER BY timestamp ASC'),
 
-  // Bans
   addBan: db.prepare('INSERT INTO bans (fingerprint, ip, user_agent, reason) VALUES (?, ?, ?, ?)'),
   removeBan: db.prepare('DELETE FROM bans WHERE fingerprint = ?'),
   isBanned: db.prepare('SELECT COUNT(*) as count FROM bans WHERE fingerprint = ?'),
   getAllBans: db.prepare('SELECT * FROM bans ORDER BY created_at DESC'),
 
-  // Sync session states
   shadowBanSession: db.prepare('UPDATE sessions SET is_shadow_banned = 1 WHERE fingerprint = ? AND closed_at IS NULL'),
   unshadowBanSession: db.prepare('UPDATE sessions SET is_shadow_banned = 0 WHERE fingerprint = ? AND closed_at IS NULL'),
 
-  // Settings
   getSetting: db.prepare('SELECT value FROM settings WHERE key = ?'),
   setSetting: db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)'),
 };
@@ -121,7 +111,6 @@ module.exports = {
   },
 
   addBan(fingerprint, reason = '') {
-    // Snapshot the user's latest networking info to ban via secondary methods (Incognito bypass)
     const session = db.prepare('SELECT ip, user_agent FROM sessions WHERE fingerprint = ? ORDER BY created_at DESC LIMIT 1').get(fingerprint);
     const ip = session ? session.ip : null;
     const ua = session ? session.user_agent : null;
@@ -149,11 +138,9 @@ module.exports = {
   isBanned(fingerprint, ip = null, userAgent = null) {
     if (!fingerprint) return false;
     
-    // Check primary fingerprint
     const fpCheck = stmts.isBanned.get(fingerprint);
     if (fpCheck && fpCheck.count > 0) return true;
 
-    // Check secondary network profile (defeats incognito)
     if (ip && ip !== 'unknown' && ip !== '::1' && userAgent && userAgent !== 'Unknown') {
       const ipCheck = db.prepare('SELECT COUNT(*) as count FROM bans WHERE ip = ? AND user_agent = ?').get(ip, userAgent);
       if (ipCheck && ipCheck.count > 0) return true;
@@ -183,3 +170,4 @@ module.exports = {
     return this.setSetting('owner_status', status);
   }
 };
+

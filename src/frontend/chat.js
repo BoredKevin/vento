@@ -1,11 +1,7 @@
-// ========================================
-// VENTO — Chat Client Logic
-// ========================================
 
 (function () {
   'use strict';
 
-  // --- State ---
   const callsign = sessionStorage.getItem('vento_callsign');
   const mode = sessionStorage.getItem('vento_mode');
   const fingerprint = sessionStorage.getItem('vento_fingerprint');
@@ -15,7 +11,6 @@
     return;
   }
 
-  // --- DOM Elements ---
   const messagesContainer = document.getElementById('chat-messages');
   const chatInput = document.getElementById('chat-input');
   const btnSend = document.getElementById('btn-send');
@@ -29,14 +24,12 @@
 
   callsignEl.textContent = callsign;
 
-  // --- Socket.IO Connection ---
   const socket = io({
     reconnection: true,
     reconnectionDelay: 1000,
     reconnectionAttempts: 20,
   });
 
-  // --- Connection Events ---
   socket.on('connect', () => {
     connectionBar.classList.remove('show');
     btnSend.disabled = false;
@@ -47,7 +40,6 @@
       socket.emit('start-session', { callsign, fingerprint });
     }
 
-    // Update mode so reconnections use rejoin
     sessionStorage.setItem('vento_mode', 'rejoin');
   });
 
@@ -62,7 +54,6 @@
     connectionBar.className = 'connection-bar show reconnecting';
   });
 
-  // --- Session Events ---
   socket.on('session-started', (data) => {
     updateStatus(data.status);
     addSystemMessage('Session started. You are anonymous.');
@@ -71,9 +62,7 @@
   socket.on('session-rejoined', (data) => {
     updateStatus(data.status);
 
-    // Load message history
     if (data.messages && data.messages.length > 0) {
-      // Clear existing messages except the system welcome
       const systemMsg = messagesContainer.querySelector('.message.system');
       messagesContainer.innerHTML = '';
       if (systemMsg) messagesContainer.appendChild(systemMsg);
@@ -93,7 +82,6 @@
     chatInput.placeholder = 'Session ended';
   });
 
-  // --- Messages ---
   socket.on('message', (data) => {
     addMessage(data.sender, data.content, data.timestamp, true);
     hideTyping();
@@ -103,12 +91,10 @@
     showToast(data.message, 'error');
   });
 
-  // --- Owner Status ---
   socket.on('owner-status', (data) => {
     updateStatus(data.status);
   });
 
-  // --- Typing ---
   let typingTimeout = null;
 
   socket.on('owner-typing', () => {
@@ -117,7 +103,6 @@
     typingTimeout = setTimeout(hideTyping, 3000);
   });
 
-  // Emit typing when the user types
   let lastTypingEmit = 0;
   chatInput.addEventListener('input', () => {
     const now = Date.now();
@@ -126,15 +111,12 @@
       lastTypingEmit = now;
     }
 
-    // Auto-resize textarea
     chatInput.style.height = 'auto';
     chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
 
-    // Enable/disable send button
     btnSend.disabled = !chatInput.value.trim();
   });
 
-  // --- Send Message ---
   function sendMessage() {
     const content = chatInput.value.trim();
     if (!content) return;
@@ -154,7 +136,6 @@
     }
   });
 
-  // --- End Session ---
   btnEnd.addEventListener('click', () => {
     if (confirm('End this session? You can rejoin later using your callsign.')) {
       socket.emit('end-session');
@@ -165,7 +146,6 @@
     }
   });
 
-  // --- UI Helpers ---
   function addMessage(sender, content, timestamp, animate = true) {
     const msgEl = document.createElement('div');
     msgEl.className = `message ${sender}`;
@@ -183,7 +163,6 @@
     messagesContainer.appendChild(msgEl);
     scrollToBottom();
 
-    // Play notification sound for incoming messages
     if (sender === 'kevin' && animate) {
       playNotificationSound();
     }
@@ -230,7 +209,6 @@
     return div.innerHTML;
   }
 
-  // --- Notification Sound (subtle) ---
   function playNotificationSound() {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -249,10 +227,9 @@
 
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.3);
-    } catch (e) { /* Audio not available */ }
+    } catch (e) {  }
   }
 
-  // --- Canvas Background (subtle in chat) ---
   (function initCanvas() {
     const canvas = document.getElementById('bg-canvas');
     if (!canvas) return;
@@ -300,3 +277,4 @@
     draw();
   })();
 })();
+

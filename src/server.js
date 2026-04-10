@@ -22,8 +22,6 @@ const io = new Server(server, {
   pingInterval: 25000,
 });
 
-// --- Middleware ---
-
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -41,7 +39,6 @@ app.use(helmet({
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Rate limiting
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100,
@@ -49,8 +46,6 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 app.use('/api/', apiLimiter);
-
-// --- Helper Functions ---
 
 function getClientIp(req) {
   return req.headers['x-forwarded-for']?.split(',')[0]?.trim()
@@ -87,18 +82,11 @@ async function getGeoLocation(ip) {
   return 'Unknown';
 }
 
-// Track active callsigns (for collision avoidance)
 const activeCallsigns = new Set();
-// Track socket -> callsign mapping
 const socketToCallsign = new Map();
-// Track callsign -> socket mapping
 const callsignToSocket = new Map();
-// Rate limit: track message timestamps per socket
 const messageTimes = new Map();
 
-// --- API Routes ---
-
-// Start a new session (server generates callsign, Turnstile must be done first)
 app.post('/api/start-session', async (req, res) => {
   const { fingerprint } = req.body;
 
@@ -106,20 +94,16 @@ app.post('/api/start-session', async (req, res) => {
     return res.status(400).json({ success: false, error: 'Missing fingerprint' });
   }
 
-  // Generate callsign server-side
   const callsign = generateCallsign(activeCallsigns);
 
-  // Check shadow ban
   const isBanned = db.isBanned(fingerprint);
 
-  // Gather metadata
   const ip = getClientIp(req);
   const ua = req.headers['user-agent'] || '';
   const device = parseUserAgent(ua);
   const location = await getGeoLocation(ip);
 
   if (isBanned) {
-    // Shadow ban: create a fake session, don't create Discord channel
     db.createSession({
       callsign,
       fingerprint,
@@ -134,7 +118,6 @@ app.post('/api/start-session', async (req, res) => {
     return res.json({ success: true, callsign });
   }
 
-  // Real session — create Discord channel
   const channelId = await bot.createVentChannel(callsign, {
     fingerprint,
     ip,
@@ -156,7 +139,6 @@ app.post('/api/start-session', async (req, res) => {
   res.json({ success: true, callsign });
 });
 
-// Verify Turnstile token
 app.post('/api/verify-turnstile', async (req, res) => {
   const { token } = req.body;
 
@@ -187,12 +169,10 @@ app.post('/api/verify-turnstile', async (req, res) => {
   }
 });
 
-// Get owner status
 app.get('/api/status', (req, res) => {
   res.json({ status: db.getOwnerStatus() });
 });
 
-// Check if a callsign has an existing session (for rejoin)
 app.get('/api/session/:callsign', (req, res) => {
   const callsign = normalizeCallsign(req.params.callsign);
   if (!isValidCallsign(callsign)) {
@@ -205,12 +185,9 @@ app.get('/api/session/:callsign', (req, res) => {
   res.json({ exists: false });
 });
 
-// --- Socket.IO ---
-
 io.on('connection', (socket) => {
   console.log(`[Socket] Connected: ${socket.id}`);
 
-  // --- Join Session (session already created via POST /api/start-session) ---
   socket.on('start-session', async (data) => {
     const callsign = normalizeCallsign(data.callsign);
     const { fingerprint } = data;
@@ -220,20 +197,17 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Verify session exists in DB
     const session = db.getSession(callsign);
     if (!session) {
       socket.emit('error-msg', { message: 'Session not found. Please start a new one.' });
       return;
     }
 
-    // Check if callsign is already active (another socket connected)
     if (activeCallsigns.has(callsign)) {
       socket.emit('error-msg', { message: 'This callsign is already connected.' });
       return;
     }
 
-    // Join the room
     activeCallsigns.add(callsign);
     socketToCallsign.set(socket.id, callsign);
     callsignToSocket.set(callsign, socket.id);
@@ -247,7 +221,6 @@ io.on('connection', (socket) => {
     console.log(`[Socket] Joined session: ${callsign}`);
   });
 
-  // --- Rejoin Session ---
   socket.on('rejoin-session', async (data) => {
     const callsign = normalizeCallsign(data.callsign);
     const { fingerprint } = data;
@@ -268,12 +241,10 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Gather secondary metadata for evasive incognito users
     const ip = getClientIp(socket.request);
     const ua = socket.request.headers['user-agent'] || '';
     const device = parseUserAgent(ua);
 
-    // Check shadow ban
     const isBanned = db.isBanned(fingerprint, ip, device);
 
     activeCallsigns.add(callsign);
@@ -281,7 +252,6 @@ io.on('connection', (socket) => {
     callsignToSocket.set(callsign, socket.id);
     socket.join(`session:${callsign}`);
 
-    // Load message history
     const messages = db.getMessages(session.id);
 
     socket.emit('session-rejoined', {
@@ -294,7 +264,6 @@ io.on('connection', (socket) => {
       })),
     });
 
-    // Notify on Discord
     if (!isBanned && session.discord_channel_id) {
       bot.sendSystemMessage(callsign, `🔄 **${callsign}** has reconnected.`);
     }
@@ -302,12 +271,10 @@ io.on('connection', (socket) => {
     console.log(`[Session] Rejoined: ${callsign}`);
   });
 
-  // --- Send Message ---
   socket.on('send-message', (data) => {
     const callsign = socketToCallsign.get(socket.id);
     if (!callsign) return;
 
-    // Rate limiting: 1 message per second
     const now = Date.now();
     const lastTime = messageTimes.get(socket.id) || 0;
     if (now - lastTime < 1000) {
@@ -316,38 +283,32 @@ io.on('connection', (socket) => {
     }
     messageTimes.set(socket.id, now);
 
-    // Sanitize and filter
     let content = xss(data.content || '');
     if (!content.trim()) return;
     if (content.length > 2000) content = content.slice(0, 2000);
 
-    // Apply profanity filter
     content = filterMessage(content);
 
     const session = db.getSession(callsign);
     if (!session) return;
 
-    // Save to DB
     db.addMessage({
       sessionId: session.id,
       sender: 'anonymous',
       content,
     });
 
-    // Send back to the user (echo with filtered content)
     socket.emit('message', {
       sender: 'anonymous',
       content,
       timestamp: new Date().toISOString(),
     });
 
-    // Forward to Discord (unless shadow banned)
     if (!session.is_shadow_banned) {
       bot.sendToChannel(callsign, content);
     }
   });
 
-  // --- Typing Indicator ---
   socket.on('typing', () => {
     const callsign = socketToCallsign.get(socket.id);
     if (!callsign) return;
@@ -358,12 +319,10 @@ io.on('connection', (socket) => {
     }
   });
 
-  // --- End Session ---
   socket.on('end-session', () => {
     handleDisconnect(socket);
   });
 
-  // --- Disconnect ---
   socket.on('disconnect', () => {
     handleDisconnect(socket);
   });
@@ -375,12 +334,10 @@ function handleDisconnect(socket) {
 
   const session = db.getSession(callsign);
 
-  // Notify Discord
   if (session && !session.is_shadow_banned) {
     bot.sendSystemMessage(callsign, `👋 **${callsign}** has disconnected.`);
   }
 
-  // Clean up mappings (but don't close session — allow rejoin)
   activeCallsigns.delete(callsign);
   socketToCallsign.delete(socket.id);
   callsignToSocket.delete(callsign);
@@ -388,8 +345,6 @@ function handleDisconnect(socket) {
 
   console.log(`[Socket] Disconnected: ${socket.id} (was ${callsign})`);
 }
-
-// --- Start Server ---
 
 const PORT = process.env.PORT || 3000;
 
@@ -408,3 +363,4 @@ async function start() {
 }
 
 start();
+

@@ -1,7 +1,4 @@
-// Profanity filter — replaces offensive words with asterisks
-// Messages are still delivered, only the words are masked
 
-// Core slur list (kept minimal and targeted)
 const SLURS = [
   'nigger', 'nigga', 'niggers', 'niggas',
   'faggot', 'faggots', 'fag', 'fags',
@@ -19,7 +16,6 @@ const SLURS = [
   'towelhead', 'towelheads',
 ];
 
-// Common letter substitutions for bypass detection
 const SUBSTITUTIONS = {
   'a': ['@', '4'],
   'e': ['3'],
@@ -30,9 +26,6 @@ const SUBSTITUTIONS = {
   't': ['7'],
 };
 
-/**
- * Build regex pattern that accounts for common letter substitutions
- */
 function buildPattern(word) {
   let pattern = '';
   for (const char of word.toLowerCase()) {
@@ -46,17 +39,11 @@ function buildPattern(word) {
   return pattern;
 }
 
-// Pre-compile all patterns
 const PATTERNS = SLURS.map(word => ({
   regex: new RegExp(`\\b${buildPattern(word)}\\b`, 'gi'),
   word,
 }));
 
-/**
- * Filter a message — replaces slur words with asterisks
- * @param {string} message - The raw message
- * @returns {string} - The filtered message
- */
 function filterMessage(message) {
   if (!message || typeof message !== 'string') return message;
 
@@ -64,7 +51,6 @@ function filterMessage(message) {
 
   for (const { regex } of PATTERNS) {
     filtered = filtered.replace(regex, (match) => {
-      // Keep first letter, replace rest with asterisks
       return match[0] + '*'.repeat(match.length - 1);
     });
   }
@@ -73,3 +59,4 @@ function filterMessage(message) {
 }
 
 module.exports = { filterMessage };
+

@@ -1,4 +1,3 @@
-// Curated word list — short, memorable, easy to type
 const WORDS = [
   'Amber', 'Ash', 'Atlas', 'Aurora', 'Autumn',
   'Birch', 'Blaze', 'Bloom', 'Bolt', 'Breeze',
@@ -34,11 +33,6 @@ const WORDS = [
   'Wolf', 'Wren', 'Zeal', 'Zen', 'Zephyr',
 ];
 
-/**
- * Generates a callsign like "Tiger42", "Ocean15", "Falcon87"
- * @param {Set<string>} [activeCallsigns] - Set of currently active callsigns to avoid collisions
- * @returns {string}
- */
 function generateCallsign(activeCallsigns = new Set()) {
   const maxAttempts = 500;
 
@@ -52,26 +46,15 @@ function generateCallsign(activeCallsigns = new Set()) {
     }
   }
 
-  // Extremely unlikely fallback — just append timestamp
   const word = WORDS[Math.floor(Math.random() * WORDS.length)];
   return `${word}${Date.now() % 100}`;
 }
 
-/**
- * Validates that a string looks like a valid callsign format (case-insensitive)
- * @param {string} str
- * @returns {boolean}
- */
 function isValidCallsign(str) {
   if (!str || typeof str !== 'string') return false;
   return /^[a-zA-Z]+\d{2}$/.test(str);
 }
 
-/**
- * Normalizes a callsign to TitleCase (e.g. "tiger42" -> "Tiger42")
- * @param {string} str
- * @returns {string}
- */
 function normalizeCallsign(str) {
   if (!str || typeof str !== 'string') return '';
   const trimmed = str.trim();
@@ -83,3 +66,4 @@ function normalizeCallsign(str) {
 }
 
 module.exports = { generateCallsign, isValidCallsign, normalizeCallsign, WORDS };
+
